@@ -143,18 +143,22 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+    // x & ~y 能够过滤出x为1且y为0的位
+    // (x & ~y) | (y & ~x) 即为答案
+    // 但不能用|，可以用~, &做转换
+    // (x & ~y) | (y & ~x)  -> ~~((x & ~y) | (y & ~x)) -> ~(~(x & ~y) & ~(y & ~x))
+
+    // 这里我的思路不好，更好的思路是 ~(~x&~y) & ~(x&y)，即不同为1且不同为0
+    return ~(~(x & ~y) & ~(y & ~x));
 }
-/* 
+/*
  * tmin - return minimum two's complement integer 
  *   Legal ops: ! ~ & ^ | + << >>
  *   Max ops: 4
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+    return 1 << 31;
 }
 //2
 /*
@@ -165,7 +169,11 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+    int i = x + 1;
+    int j = i + x;
+
+    // i != 0 且 ~j == 0
+    return !(~j + !i);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -176,7 +184,8 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+    int odd_32 = 0xAA | (0xAA << 8) | (0xAA << 16) | (0xAA << 24);
+    return !((x & odd_32) ^ (odd_32));
 }
 /* 
  * negate - return -x 
@@ -186,7 +195,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+    return ~x + 1;
 }
 //3
 /* 
@@ -199,7 +208,7 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+    return !(((x >> 4) ^ 0x03) | !(!(x & 0x08) | !(x & 0x06)));
 }
 /* 
  * conditional - same as x ? y : z 
@@ -209,7 +218,9 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+    int mask_z = ((!x) << 31) >> 31;
+    int mask_y = ~mask_z;
+    return (mask_y & y) | (mask_z & z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -219,7 +230,13 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+    // 先比较符号（处理溢出），符号相同比较大小
+    int sign_x = (x >> 31);
+    int sign_y = (y >> 31);
+    int sign_mask = sign_x ^sign_y;
+
+    // 符号不同（取x的符号位为结果） | 符号相同 (取y-x的符号位的 ! 为结果，用y-x而不是x-y是为了兼容x=y的场景)
+    return (sign_mask & sign_x & 0x01) | (~sign_mask & !(((y + ~x + 1) >> 31) & 0x01));
 }
 //4
 /* 
@@ -231,7 +248,12 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+    x = (x >> 16) | x;
+    x = (x >> 8) | x;
+    x = (x >> 4) | x;
+    x = (x >> 2) | x;
+    x = (x >> 1) | x;
+    return (~x & 0x01);
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -246,7 +268,47 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+    int result = 0;
+    int half, in_low, low_mask, high_mask, bit_mask;
+
+    x = ((~(x >> 31) & x) | ((x >> 31) & ~x));
+
+    half = x >> 16;
+    in_low = !half;  //  0表示结果在高位，1表示结果在低位
+    low_mask = ((in_low) << 31) >> 31;
+    high_mask = ~low_mask;
+    bit_mask = (0xFF << 8) | 0XFF;  // 高16位置0
+    x = ((half & high_mask) | (x & low_mask)) & bit_mask;
+    result += low_mask & 16;
+
+    half = x >> 8;
+    in_low = !half;
+    low_mask = ((in_low) << 31) >> 31;
+    high_mask = ~low_mask;
+    bit_mask = 0xFF;  // 高8位置0
+    x = ((half & high_mask) | (x & low_mask)) & bit_mask;
+    result += low_mask & 8;
+
+    half = x >> 4;
+    in_low = !half;
+    low_mask = ((in_low) << 31) >> 31;
+    high_mask = ~low_mask;
+    bit_mask = 0x0F;  // 高4位置0
+    x = ((half & high_mask) | (x & low_mask)) & bit_mask;
+    result += low_mask & 4;
+
+    half = x >> 2;
+    in_low = !half;
+    low_mask = ((in_low) << 31) >> 31;
+    high_mask = ~low_mask;
+    bit_mask = 0x03;  // 高2位置0
+    x = ((half & high_mask) | (x & low_mask)) & bit_mask;
+    result += low_mask & 2;
+
+    half = x >> 1;
+    result += !half;
+    result += !half & !x;
+    return 32 + ~result + 2;
 }
 //float
 /* 
